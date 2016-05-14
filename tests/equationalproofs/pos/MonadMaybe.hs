@@ -59,7 +59,7 @@ right_identity (Just x)
 
 
 -- | Associativity:	  (m >>= f) >>= g ≡	m >>= (\x -> f x >>= g)
-{- associativity :: m:Maybe a -> f: (a -> Maybe b) -> g:(b -> Maybe c)
+{-@ associativity :: m:Maybe a -> f: (a -> Maybe b) -> g:(b -> Maybe c)
   -> {v:Proof | bind (bind m f) g == bind m (\x:a -> (bind (f x) g))} @-}
 associativity :: Maybe a -> (a -> Maybe b) -> (b -> Maybe c) -> Proof
 associativity Nothing f g
@@ -67,7 +67,7 @@ associativity Nothing f g
        bind (bind Nothing f) g
          ==! bind Nothing g
          ==! Nothing
-         ==! bind Nothing (\x -> bind (f x) g)
+         ==? bind Nothing (\x -> bind (f x) g)
 associativity (Just x) f g
   = toProof $
        bind (bind (Just x) f) g

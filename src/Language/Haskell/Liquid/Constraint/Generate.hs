@@ -295,7 +295,7 @@ measEnv sp xts cbs lts asms itys hs cfg
   = CGE { cgLoc = Sp.empty
         , renv  = fromListREnv (second val <$> meas sp) []
         , syenv = F.fromListSEnv $ freeSyms sp
-        , fenv  = initFEnv $ lts ++ (second (rTypeSort tce . val) <$> meas sp)
+        , fenv  = initFEnv $ filterHO (lts ++ (second (rTypeSort tce . val) <$> meas sp))
         , denv  = dicts sp
         , recs  = S.empty
         , fargs = S.empty
@@ -318,6 +318,7 @@ measEnv sp xts cbs lts asms itys hs cfg
         }
     where
       tce = tcEmbeds sp
+      filterHO xts = if higherorder cfg then xts else filter (F.isBaseSort . snd) xts 
 
 assm :: GhcInfo -> [(Var, SpecType)]
 assm = assmGrty impVars
@@ -1018,6 +1019,7 @@ cconsE' γ e t
 
 addFunctionConstraint :: CGEnv -> Var -> CoreExpr -> SpecType -> CG ()
 addFunctionConstraint γ x e (RFun y ty t r) 
+  | higherorder $ cgCfg γ
   = do ty'      <- true ty 
        t'       <- true t
        let truet = RFun y ty' t'  
@@ -1028,8 +1030,10 @@ addFunctionConstraint γ x e (RFun y ty t r)
                         addC (SubC γ (truet ref) $ truet r)    "function constraint singleton"
           Nothing ->    addC (SubC γ (truet mempty) $ truet r) "function constraint true"
 addFunctionConstraint γ _ _ _ 
+  | higherorder $ cgCfg γ
   = impossible (Just $ getLocation γ) "addFunctionConstraint: called on non function argument"
-
+addFunctionConstraint _ _ _ _ 
+  = return ()
 splitConstraints :: TyConable c
                  => RType c tv r -> ([[(F.Symbol, RType c tv r)]], RType c tv r)
 splitConstraints (RRTy cs _ OCons t)
@@ -1098,7 +1102,7 @@ consE γ e
 -- no need to check this code with flag, the axioms environment withh
 -- be empty if there is no axiomatization
 
-consE γ e'@(App e@(Var x) (Type τ)) | (M.member x $ aenv γ)
+consE γ e'@(App e@(Var x) (Type τ)) | (higherorder $ cgCfg γ) && (M.member x $ aenv γ)
   = do RAllT α te <- checkAll ("Non-all TyApp with expr", e) γ <$> consE γ e
        t          <- if isGeneric α te then freshTy_type TypeInstE e τ else trueTy τ
        addW        $ WfC γ t
@@ -1540,11 +1544,14 @@ varRefType' γ x t'
   where
     xr = singletonReft (M.lookup x $ aenv γ) x
     x' = F.symbol x
-    strengthen 
+    strengthen t r
       | higherorder (cgCfg γ) 
-      = strengthenMeet 
-      | otherwise 
-      = strengthenTop  
+      = strengthenMeet t r
+      | isBase t'  
+      = strengthenTop  t r
+      | otherwise
+      = t 
+
 
 -- | create singleton types for function application
 makeSingleton :: CGEnv -> CoreExpr -> SpecType -> SpecType
