@@ -7,33 +7,20 @@
 {-# LANGUAGE IncoherentInstances   #-}
 {-# LANGUAGE FlexibleContexts      #-}
 
-module MonadMaybe where
-
-import Prelude hiding (return, Maybe(..))
+module MonadList where
 
 import Proves
 import Helper
+import Prelude hiding (return)
+
+
+import Append
+import ListDef
 
 -- | Monad Laws :
 -- | Left identity:	  return a >>= f  ≡ f a
 -- | Right identity:	m >>= return    ≡ m
 -- | Associativity:	  (m >>= f) >>= g ≡	m >>= (\x -> f x >>= g)
-
-{-@ axiomatize return @-}
-return :: a -> L a
-return x = C x N
-
-{-@ axiomatize bind @-}
-bind :: L a -> (a -> L b) -> L b
-bind m f
-  | llen m > 0 = append (f (hd m)) (bind (tl m) f)
-  | otherwise  = N
-
-{-@ axiomatize append @-}
-append :: L a -> L a -> L a
-append xs ys
-  | llen xs == 0 = ys
-  | otherwise    = C (hd xs) (append (tl xs) ys)
 
 -- | Left Identity
 
@@ -106,57 +93,3 @@ bind_append (C x xs) ys f
         ==! append (f x) (append (bind xs f) (bind ys f)) ? bind_append xs ys f
         ==! append (append (f x) (bind xs f)) (bind ys f) ? prop_assoc (f x) (bind xs f) (bind ys f)
         ==! append (bind (C x xs) f) (bind ys f)
-
-
-
-
-data L a = N | C a (L a)
-{-@ data L [llen] @-}
-
-{-@ measure llen @-}
-llen :: L a -> Int
-{-@ llen :: L a -> Nat @-}
-llen N        = 0
-llen (C _ xs) = 1 + llen xs
-
-{-@ measure hd @-}
-{-@ hd :: {v:L a | llen v > 0 } -> a @-}
-hd :: L a -> a
-hd (C x _) = x
-
-{-@ measure tl @-}
-{-@ tl :: xs:{L a | llen xs > 0 } -> {v:L a | llen v == llen xs - 1 } @-}
-tl :: L a -> L a
-tl (C _ xs) = xs
-
-
--- NV TODO: import there
-
--- imported from Append
-prop_append_neutral :: L a -> Proof
-{-@ prop_append_neutral :: xs:L a -> {v:Proof | append xs N == xs }  @-}
-prop_append_neutral N
-  = toProof $
-       append N N ==! N
-prop_append_neutral (C x xs)
-  = toProof $
-       append (C x xs) N ==! C x (append xs N)
-                         ==! C x xs             ? prop_append_neutral xs
-
-
-
-{-@ prop_assoc :: xs:L a -> ys:L a -> zs:L a
-               -> {v:Proof | append (append xs ys) zs == append xs (append ys zs) } @-}
-prop_assoc :: L a -> L a -> L a -> Proof
-prop_assoc N ys zs
-  = toProof $
-       append (append N ys) zs ==! append ys zs
-                               ==! append N (append ys zs)
-
-prop_assoc (C x xs) ys zs
-  = toProof $
-      append (append (C x xs) ys) zs
-        ==! append (C x (append xs ys)) zs
-        ==! C x (append (append xs ys) zs)
-        ==! C x (append xs (append ys zs))  ? prop_assoc xs ys zs
-        ==! append (C x xs) (append ys zs)
