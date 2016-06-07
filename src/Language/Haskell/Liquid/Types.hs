@@ -191,6 +191,8 @@ module Language.Haskell.Liquid.Types (
   , liquidBegin, liquidEnd
 
   , Axiom(..), HAxiom, LAxiom
+
+  , rtyVarUniqueSymbol, tyVarUniqueSymbol
   )
   where
 
@@ -505,6 +507,12 @@ newtype RTyVar = RTV TyVar deriving (Generic, Data, Typeable)
 
 instance Symbolic RTyVar where
   symbol (RTV tv) = symbol . getName $ tv
+
+rtyVarUniqueSymbol  :: RTyVar -> Symbol 
+rtyVarUniqueSymbol (RTV tv) = tyVarUniqueSymbol tv 
+
+tyVarUniqueSymbol :: TyVar -> Symbol
+tyVarUniqueSymbol tv = symbol $ show (getName tv) ++ "_" ++ show (varUnique tv)
 
 
 data RTyCon = RTyCon
