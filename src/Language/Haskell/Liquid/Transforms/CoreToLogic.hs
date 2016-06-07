@@ -12,6 +12,7 @@ module Language.Haskell.Liquid.Transforms.CoreToLogic (
   logicType,
 
   strengthenResult,
+  strengthenResult',
 
   normalize
 
@@ -34,7 +35,7 @@ import           TysWiredIn
 
 
 
-import           Language.Fixpoint.Misc                (snd3)
+import           Language.Fixpoint.Misc                (snd3, traceShow)
 
 import           Language.Fixpoint.Types               hiding (Error, R, simplify)
 import qualified Language.Fixpoint.Types               as F
@@ -89,6 +90,37 @@ strengthenResult v
         f   = dummyLoc $ dropModuleNames $ simplesymbol v
         t   = (ofType $ varType v) :: SpecType
         mkA = EVar . fst -- if isBool t then EApp (dummyLoc propConName) [(EVar x)] else EVar x
+
+
+strengthenResult' :: Var -> SpecType
+strengthenResult' v
+  | isBool $ ty_res $ toRTypeRep t 
+  = -- traceShow ("Type for " ++ showPpr v ++ "\t OF \t" ++ show (ty_binds rep)) $
+    go mkProp [] [1..] t 
+  | otherwise
+  = go mkExpr [] [1..] t 
+  where f   = dummyLoc $ dropModuleNames $ simplesymbol v
+        t   = (ofType $ varType v) :: SpecType
+
+        -- refine types of meaures: keep going until you find the last data con!
+        go f args i (RAllT a t) 
+          = RAllT a $ go f args i t
+        go f args i (RAllP p t) 
+          = RAllP p $ go f args i t 
+        go f args i (RFun x t1 t2 r)
+          | isClassType t1
+          = RFun x t1 (go f args i t2) r 
+        go f args i (RFun _ t1 t2 r)
+          | RApp _ _ _ _ <- t1 
+          = let x' = intSymbol (symbol ("x" :: String)) (head i)
+            in RFun x' t1 (go f (x':args) (tail i) t2) r
+        go f args _ t
+          = t `strengthen` f args
+
+        mkExpr xs = MkUReft (exprReft $ mkEApp f (EVar <$> reverse xs)) mempty mempty
+        mkProp xs = MkUReft (propReft $ mkEApp f (EVar <$> reverse xs)) mempty mempty
+
+
 
 
 simplesymbol :: Var -> Symbol
@@ -251,7 +283,7 @@ casesToLg _v e alts
     go [(_,p)]     = return p
     go ((d,p):dps) = do c <- checkDataCon d e 
                         e' <- go dps 
-                        return $ EIte c p e' 
+                        return $ traceShow ("CASE ALT") $ EIte c p e' 
     go []          = throw "Bah"
 
 checkDataCon :: DataCon -> Expr -> LogicM Expr 
