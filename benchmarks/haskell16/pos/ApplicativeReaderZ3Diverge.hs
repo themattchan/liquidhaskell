@@ -2,7 +2,7 @@
 {-@ LIQUID "--totality"        @-}
 {-@ LIQUID "--exact-data-cons" @-}
 {-@ LIQUID "--extensionality"  @-}
-{-@ LIQUID "--decidable"       @-}
+{- LIQUID "--decidable"       @-}
 
 
 

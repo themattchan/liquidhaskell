@@ -31,6 +31,12 @@ fib n
 {- unsafe :: _ -> { fib 2 == 1 } @-}
 unsafe () = ()
 
+
+{-@ safeP :: () -> { fib 2 == 1 } @-}
+safeP :: () -> (Int, Int, Int)
+safeP () =
+  (fib 2, fib 0, fib 1)
+
 {-@ safe :: () -> { fib 2 == 1 } @-}
 safe :: () -> Proof
 safe () =
